@@ -8,6 +8,13 @@ import { now } from "../utils/time.js";
 // Makes a new job object and saves it into the queue folder.
 export function createJob(config, data) {
   const id = data.id || newId();
+  // Prevent duplicates: if a job with this id exists anywhere, do not create a new one
+  const existing = findJobAny(config, id);
+  if (existing) {
+    const err = new Error(`Job already exists: ${id}`);
+    err.code = 'EJOB_EXISTS';
+    throw err;
+  }
   const job = {
     id,
     command: data.command,

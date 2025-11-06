@@ -44,9 +44,14 @@ export function makeRoutes(cli) {
           process.exitCode = 1;
           return;
         }
-        const job = enqueueController(argv.__config, raw);
-        console.log(`Enqueued job ${job.id} with command: ${JSON.stringify(job.command)}`);
-        console.log(job.id);
+        try {
+          const job = enqueueController(argv.__config, raw);
+          console.log(`Enqueued job ${job.id} with command: ${JSON.stringify(job.command)}`);
+          console.log(job.id);
+        } catch (e) {
+          console.error(String(e.message || e));
+          process.exitCode = 1;
+        }
       }
     )
     .command(
