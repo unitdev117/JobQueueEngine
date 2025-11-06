@@ -77,7 +77,7 @@ export function makeRoutes(cli) {
         console.log("Queue Status:");
         console.log(`  pending:   ${s.counts.pending}`);
         console.log(`  failed:    ${s.counts.failed}`);
-        console.log(`  processing:${s.counts.processing}`);
+        console.log(`  processing: ${s.counts.processing}`);
         console.log(`  completed: ${s.counts.completed}`);
         console.log(`  dead:      ${s.counts.dead}`);
         if (w && w.pid) {

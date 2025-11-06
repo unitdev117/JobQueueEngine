@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runWorkers } from '../services/workerService.js';
+import { sanitizeQueueStates } from '../services/jobService.js';
 import { initLogger, readWorkersRuntime, logJson } from '../utils/logger.js';
 import { spawn, execSync } from 'node:child_process';
 
@@ -20,6 +21,8 @@ export async function workerStartController(config, count, opts = {}) {
     child.unref();
     return;
   }
+  // Repair any inconsistent queue states before starting
+  try { sanitizeQueueStates(config); } catch {}
   await runWorkers(config, howMany);
 }
 

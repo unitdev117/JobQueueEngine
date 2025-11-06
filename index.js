@@ -46,7 +46,9 @@ function startDashboardServer(port) {
     let pending = 0, failed = 0;
     for (const f of listJsonFilesSync(dirs.queue)) {
       const j = readJsonSafe(f);
-      if (j && j.state === 'failed') failed++; else pending++;
+      if (j && j.state === 'failed') failed++;
+      else if (j && j.state === 'pending') pending++;
+      // ignore any other unexpected state lingering in queue
     }
     const processingFiles = listJsonFilesSync(dirs.processing);
     const processing = processingFiles.length;

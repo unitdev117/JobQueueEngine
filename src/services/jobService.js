@@ -81,11 +81,12 @@ export function countByState(config) {
   for (const f of listJsonFiles(p.queue)) {
     try {
       const j = readJson(f);
+      // Mirror list command semantics: only explicit 'pending' counts as pending
       if (j && j.state === 'failed') failed++;
-      else pending++;
+      else if (j && j.state === 'pending') pending++;
+      // Any other state lingering in queue (e.g., 'processing') is ignored in counts
     } catch {
-      // If unreadable, treat as pending to avoid hiding items
-      pending++;
+      // Unreadable JSON: do not inflate counts; ignore for accuracy
     }
   }
   return {
@@ -95,4 +96,20 @@ export function countByState(config) {
     dead: listJsonFiles(p.dlq).length,
     completed: listJsonFiles(p.archive).length,
   };
+}
+
+// Ensures all jobs in queue/ have a valid queue state: 'pending' or 'failed'.
+// If anything else is found (e.g., 'processing' due to a crash), normalize to 'pending'.
+export function sanitizeQueueStates(config) {
+  const p = queuePaths(config);
+  for (const f of listJsonFiles(p.queue)) {
+    try {
+      const j = readJson(f);
+      if (!j || (j.state === 'pending' || j.state === 'failed')) continue;
+      const fixed = { ...j, state: 'pending', lease: undefined, updated_at: new Date().toISOString() };
+      writeJsonAtomic(f, fixed);
+    } catch {
+      // ignore unreadable
+    }
+  }
 }

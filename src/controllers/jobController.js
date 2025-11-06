@@ -1,4 +1,4 @@
-import { createJob, countByState, findJobAny } from "../services/jobService.js";
+import { createJob, countByState, findJobAny, sanitizeQueueStates } from "../services/jobService.js";
 import { readJson } from "../utils/fsAtomic.js";
 import { logJson } from "../utils/logger.js";
 
@@ -39,6 +39,8 @@ export function enqueueController(config, jobJson) {
 
 // Shows basic status (config snapshot and counts by state).
 export function statusController(config) {
+  // Ensure queue invariants before reporting
+  try { sanitizeQueueStates(config); } catch {}
   const result = {
     config: { ...config, QUEUE_ROOT: config.QUEUE_ROOT, LOG_DIR: config.LOG_DIR },
     counts: countByState(config),
