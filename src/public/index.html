@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Queue Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>QueueCTL Dashboard</h1>
+      <p id="picked-paths">Auto-refreshing every 30s</p>
+    </header>
+
+    <main>
+      <section class="panel simple">
+        <h2>Workers</h2>
+        <div id="worker-count" class="big-number">-</div>
+        <div class="small-hint">Active workers</div>
+      </section>
+
+      <section class="panel simple">
+        <h2>Status</h2>
+        <div class="status-row">
+          <button class="status-card" data-state="pending">
+            <div class="count" id="count-pending">0</div>
+            <div class="label">Pending</div>
+          </button>
+          <button class="status-card" data-state="failed">
+            <div class="count" id="count-failed">0</div>
+            <div class="label">Failed</div>
+          </button>
+          <button class="status-card" data-state="processing">
+            <div class="count" id="count-processing">0</div>
+            <div class="label">Processing</div>
+          </button>
+          <button class="status-card" data-state="completed">
+            <div class="count" id="count-completed">0</div>
+            <div class="label">Completed</div>
+          </button>
+          <button class="status-card" data-state="dead">
+            <div class="count" id="count-dead">0</div>
+            <div class="label">Dead</div>
+          </button>
+        </div>
+
+        <div id="list-container" class="list hidden">
+          <div class="list-header">
+            <h3 id="list-title">Jobs</h3>
+            <button id="close-list" title="Close">Close</button>
+          </div>
+          <ul id="jobs-list"></ul>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>Very simple UI. Click a status to see job IDs.</small>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

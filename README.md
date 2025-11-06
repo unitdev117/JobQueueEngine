@@ -145,3 +145,34 @@ Mini shell runner example (what workers actually do)
   - `queuectl worker stop`
   - Expected: `Stop signal written. Workers will exit soon.` → then `status` says `Workers not running`.
   - In simple words: tell the robot to finish what it’s doing and go to sleep.
+
+7) Dashboard (local UI)
+- Overview:
+  - A simple static dashboard lives in `src/public` and is served by the CLI.
+  - It shows counts for: pending, failed, processing, completed, dead. Clicking a status shows job IDs in that state.
+  - Worker count uses `logs/workers.json` (runtime info). If not present, it estimates using unique `workerId` from jobs in `processing/`.
+  - The UI auto-refreshes on an interval defined in `.env` (see “Refresh interval”).
+
+- How to start the dashboard:
+  - Set a port in `.env`, for example: `PORT=9000` (no spaces around `=`).
+  - Option A (with workers): `queuectl worker start --count 1`
+    - The CLI starts a tiny static server and prints: `Dashboard available at http://localhost:<PORT>`.
+    - Note: using `--detach` will skip starting the dashboard server.
+  - Option B (without workers): `queuectl dashboard`
+    - Serves the dashboard standalone so you can view the current state without running workers.
+  - Open the printed URL in your browser.
+
+- Refresh interval (configure in `.env`):
+  - Set one of the following:
+    - `REFRESH_MS=15000` (milliseconds)
+    - or `REFRESH_SECONDS=15` (seconds; aliases: `REFRESH_INTERVAL`, `DASHBOARD_REFRESH_SEC`)
+  - Default is `30000` ms if unset.
+  - The current interval is displayed at the top of the dashboard.
+
+- Data sources (no API hooks required):
+  - The server reads directly from the filesystem:
+    - `QUEUE_ROOT` (default `./data`): reads `queue/`, `processing/`, `archive/`, `dlq/` to compute counts and lists.
+    - `LOG_DIR` (default `./logs`): reads `workers.json` for worker count if present.
+  - The UI calls simple local endpoints provided by the CLI server:
+    - `GET /api/status` → `{ pending, failed, processing, completed, dead, workers, refresh_ms }`
+    - `GET /api/list?state=pending|failed|processing|completed|dead` → `{ state, ids }`
