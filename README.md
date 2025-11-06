@@ -80,9 +80,9 @@ Extra notes (stuff that helped me)
 Mini shell runner example (what workers actually do)
 - Each worker just runs the command from the job object.
 - Examples:
-  - `queuectl enqueue -c "sleep 2" --id s1` → executes sleep 2 → exit code 0 → mark job succeeded ✅
-  - `queuectl enqueue -c "echo hello" --id e1` → executes echo hello → exit code 0 → mark job succeeded ✅ (stdout_tail has `hello`)
-  - `queuectl enqueue -c "bash -lc 'exit 1'" --id f1` → executes in bash → exit code 1 → retries with backoff → DLQ after max retries ❌
+  - `queuectl enqueue -c "sleep 2" --id s1` → executes sleep 2 → exit code 0 → mark job succeeded 
+  - `queuectl enqueue -c "echo hello" --id e1` → executes echo hello → exit code 0 → mark job succeeded  (stdout_tail has `hello`)
+  - `queuectl enqueue -c "bash -lc 'exit 1'" --id f1` → executes in bash → exit code 1 → retries with backoff → DLQ after max retries 
 
 
 6) End-to-End Test Cases (with expected output)
