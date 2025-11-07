@@ -1,122 +1,116 @@
-import fs from "node:fs";
-import path from "node:path";
-import { queuePaths, jobFilePath } from "../queues/index.js";
-import { writeJsonAtomic, readJson, moveFile, listJsonFiles } from "../utils/fsAtomic.js";
+import { connectMongo, JobModel } from "../models/index.js";
 import { newId } from "../utils/id.js";
 import { now } from "../utils/time.js";
 
-// Makes a new job object and saves it into the queue folder.
-export function createJob(config, data) {
+const VALID_STATES = ["pending", "failed", "processing", "completed", "dead"];
+
+async function ensureConnection(config) {
+  await connectMongo(config?.MONGODB_URI || process.env.MONGODB_URI);
+}
+
+export async function createJob(config, data) {
+  await ensureConnection(config);
   const id = data.id || newId();
-  // Prevent duplicates: if a job with this id exists anywhere, do not create a new one
-  const existing = findJobAny(config, id);
-  if (existing) {
+  const exists = await JobModel.findOne({ id }).lean().exec();
+  if (exists) {
     const err = new Error(`Job already exists: ${id}`);
-    err.code = 'EJOB_EXISTS';
+    err.code = "EJOB_EXISTS";
     throw err;
   }
-  const job = {
+  const timestamp = now();
+  const job = await JobModel.create({
     id,
     command: data.command,
     state: "pending",
     attempts: 0,
     max_retries: data.max_retries ?? config.MAX_RETRIES,
-    created_at: now(),
+    created_at: timestamp,
+    updated_at: timestamp,
+  });
+  return job.toObject();
+}
+
+export async function countByState(config) {
+  await ensureConnection(config);
+  const counts = {
+    pending: 0,
+    failed: 0,
+    processing: 0,
+    completed: 0,
+    dead: 0,
+  };
+  const rows = await JobModel.aggregate([
+    { $group: { _id: "$state", count: { $sum: 1 } } },
+  ]);
+  for (const row of rows) {
+    if (row && typeof row._id === "string" && counts.hasOwnProperty(row._id)) {
+      counts[row._id] = row.count;
+    }
+  }
+  return counts;
+}
+
+export async function findJobAny(config, id) {
+  await ensureConnection(config);
+  return JobModel.findOne({ id }).lean().exec();
+}
+
+export async function sanitizeQueueStates(config) {
+  await ensureConnection(config);
+  const timestamp = now();
+  await JobModel.updateMany(
+    { state: { $nin: VALID_STATES } },
+    { $set: { state: "pending", updated_at: timestamp }, $unset: { lease: "" } }
+  );
+}
+
+export async function listJobIdsByState(config, state) {
+  await ensureConnection(config);
+  if (!VALID_STATES.includes(state)) return [];
+  const docs = await JobModel.find({ state }, { id: 1 })
+    .sort({ created_at: 1, id: 1 })
+    .lean()
+    .exec();
+  return docs.map((doc) => doc.id);
+}
+
+export async function countProcessingWorkers(config) {
+  await ensureConnection(config);
+  const workers = await JobModel.distinct("lease.workerId", {
+    state: "processing",
+    "lease.workerId": { $exists: true, $ne: null },
+  });
+  return workers.filter(Boolean).length;
+}
+
+export async function resetJobToPending(config, jobId, overrides = {}) {
+  await ensureConnection(config);
+  const payload = {
+    state: "pending",
+    attempts: overrides.attempts ?? 0,
     updated_at: now(),
+    next_run_at: undefined,
+    exit_code: undefined,
+    error: undefined,
+    stdout_tail: undefined,
+    stderr_tail: undefined,
+    lease: undefined,
   };
-  const file = jobFilePath(config, "queue", id);
-  writeJsonAtomic(file, job);
-  return job;
-}
-
-// Just reads a job json file into memory.
-export function loadJob(file) {
-  return readJson(file);
-}
-
-// Saves a job back to disk (atomic write).
-export function saveJob(file, job) {
-  writeJsonAtomic(file, job);
-}
-
-// Puts a job into the archive folder (like marking completed).
-export function archiveJob(config, id, job) {
-  const src = findJobAny(config, id);
-  const dest = jobFilePath(config, "archive", id);
-  writeJsonAtomic(dest, job);
-  if (src)
-    try {
-      fs.unlinkSync(src);
-    } catch {}
-}
-
-// Moves a job from one folder to another and lets caller tweak its content.
-export function moveToDir(config, id, from, to, mutate) {
-  const src = jobFilePath(config, from, id);
-  const dest = jobFilePath(config, to, id);
-  const job = readJson(src);
-  const next = mutate ? mutate(job) : job;
-  writeJsonAtomic(src, next); // ensure content
-  moveFile(src, dest);
-  return next;
-}
-
-// Opens a job json, applies a function to change it, then saves it.
-export function updateJobInPlace(file, mutate) {
-  const job = readJson(file);
-  const next = mutate(job);
-  writeJsonAtomic(file, next);
-  return next;
-}
-
-// Finds a job by id in any of the folders we use.
-export function findJobAny(config, id) {
-  const dirs = ["queue", "processing", "dlq", "archive"];
-  for (const d of dirs) {
-    const p = jobFilePath(config, d, id);
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
-
-// Counts how many jobs are in each state (based on folders).
-export function countByState(config) {
-  const p = queuePaths(config);
-  // Split queue contents into pending vs failed based on job.state field
-  let pending = 0;
-  let failed = 0;
-  for (const f of listJsonFiles(p.queue)) {
-    try {
-      const j = readJson(f);
-      // Mirror list command semantics: only explicit 'pending' counts as pending
-      if (j && j.state === 'failed') failed++;
-      else if (j && j.state === 'pending') pending++;
-      // Any other state lingering in queue (e.g., 'processing') is ignored in counts
-    } catch {
-      // Unreadable JSON: do not inflate counts; ignore for accuracy
+  await JobModel.updateOne(
+    { id: jobId },
+    {
+      $set: {
+        ...payload,
+        ...overrides,
+      },
+      $unset: {
+        next_run_at: "",
+        exit_code: "",
+        error: "",
+        stdout_tail: "",
+        stderr_tail: "",
+        lease: "",
+      },
     }
-  }
-  return {
-    pending,
-    failed,
-    processing: listJsonFiles(p.processing).length,
-    dead: listJsonFiles(p.dlq).length,
-    completed: listJsonFiles(p.archive).length,
-  };
-}
-
-// Ensures all jobs in queue/ have a valid queue state: 'pending' or 'failed'.
-// If anything else is found (e.g., 'processing' due to a crash), normalize to 'pending'.
-export function sanitizeQueueStates(config) {
-  const p = queuePaths(config);
-  for (const f of listJsonFiles(p.queue)) {
-    try {
-      const j = readJson(f);
-      if (!j || (j.state === 'pending' || j.state === 'failed')) continue;
-      const fixed = { ...j, state: 'pending', lease: undefined, updated_at: new Date().toISOString() };
-      writeJsonAtomic(f, fixed);
-    } catch {
-      // ignore unreadable
-    }
-  }
+  );
 }

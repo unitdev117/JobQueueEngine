@@ -1,16 +1,8 @@
 import path from "node:path";
-import fs from "node:fs";
 import dotenv from "dotenv";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load .env from project root if it exists (simple and direct).
-const envPath = path.resolve(__dirname, "../../.env");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Load .env using dotenv's default resolution (it walks upward from process.cwd()).
+dotenv.config();
 
 // Builds the runtime config from env + CLI flags (CLI wins).
 // I put small defaults here to keep it running even if .env is empty.
@@ -24,6 +16,7 @@ export function loadConfig(cliOverrides = {}) {
     BACKOFF_BASE: toInt(env.BACKOFF_BASE, 2),
     MAX_BACKOFF_SEC: toInt(env.MAX_BACKOFF_SEC, 60),
     JOB_TIMEOUT_MS: toInt(env.JOB_TIMEOUT_MS, 30000),
+    MONGODB_URI: env.MONGODB_URI || "mongodb://127.0.0.1:27017/queuectl",
   };
   const merged = { ...base, ...cliOverrides };
   return {
@@ -35,9 +28,9 @@ export function loadConfig(cliOverrides = {}) {
     BACKOFF_BASE: toInt(merged.BACKOFF_BASE, base.BACKOFF_BASE),
     MAX_BACKOFF_SEC: toInt(merged.MAX_BACKOFF_SEC, base.MAX_BACKOFF_SEC),
     JOB_TIMEOUT_MS: toInt(merged.JOB_TIMEOUT_MS, base.JOB_TIMEOUT_MS),
+    MONGODB_URI: merged.MONGODB_URI || base.MONGODB_URI,
   };
 }
-
 
 function toInt(v, d) {
   const n = Number(v);

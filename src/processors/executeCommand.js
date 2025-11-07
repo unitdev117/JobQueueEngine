@@ -5,7 +5,12 @@ import { StatusCodes } from "http-status-codes";
 // It also collects the end of stdout/stderr so we can store a short tail.
 export async function executeCommand(command, timeoutMs) {
   if (!Array.isArray(command) || command.length === 0) {
-    return { code: StatusCodes.BAD_REQUEST, error: "invalid command", stdout: "", stderr: "" };
+    return {
+      code: StatusCodes.BAD_REQUEST,
+      error: "invalid command",
+      stdout: "",
+      stderr: "",
+    };
   }
   const [cmd, ...args] = command;
   return new Promise((resolve) => {
@@ -17,7 +22,12 @@ export async function executeCommand(command, timeoutMs) {
     try {
       child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      return resolve({ code: StatusCodes.NOT_FOUND, error: e.message, stdout: "", stderr: "" });
+      return resolve({
+        code: StatusCodes.NOT_FOUND,
+        error: e.message,
+        stdout: "",
+        stderr: "",
+      });
     }
     const timer = setTimeout(() => {
       if (!finished) {

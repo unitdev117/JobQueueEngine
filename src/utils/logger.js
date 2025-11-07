@@ -1,33 +1,75 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { ensureDir } from './fsAtomic.js';
+import { connectMongo, LogModel, WorkerRuntimeModel } from "../models/index.js";
 
 let logDir = null;
+let mongoUri = null;
 
-// Set up where logs go. I just store the folder path.
-export function initLogger(dir) {
-  logDir = dir;
-  ensureDir(logDir);
+export function initLogger(dir, uri) {
+  logDir = dir; // kept for backwards compatibility/log statements if needed
+  mongoUri = uri || mongoUri || process.env.MONGODB_URI;
 }
 
-// Writes one JSON log line per event. Pretty basic logger.
 export function logJson(event) {
-  if (!logDir) return;
-  const file = path.join(logDir, `${new Date().toISOString().slice(0, 10)}.log`);
-  fs.appendFileSync(file, JSON.stringify(event) + '\n');
+  void persistLog(event);
 }
 
-// This stores some info about running workers (pid and count) so status can read it.
-export function writeWorkersRuntime(info) {
-  if (!logDir) return;
-  const file = path.join(logDir, `workers.json`);
-  fs.writeFileSync(file, JSON.stringify(info, null, 2));
+export async function writeWorkersRuntime(info) {
+  try {
+    await connectMongo(mongoUri);
+    await WorkerRuntimeModel.findByIdAndUpdate(
+      "runtime",
+      {
+        _id: "runtime",
+        ...info,
+        stopRequested: false,
+        updated_at: new Date().toISOString(),
+      },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    debugLog("writeWorkersRuntime failed", err);
+  }
 }
 
-// Reads the workers runtime info back from disk.
-export function readWorkersRuntime() {
-  if (!logDir) return null;
-  const file = path.join(logDir, `workers.json`);
-  if (!fs.existsSync(file)) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+export async function setWorkersStopFlag(flag = true) {
+  try {
+    await connectMongo(mongoUri);
+    await WorkerRuntimeModel.findByIdAndUpdate(
+      "runtime",
+      {
+        _id: "runtime",
+        stopRequested: flag,
+        updated_at: new Date().toISOString(),
+      },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    debugLog("setWorkersStopFlag failed", err);
+  }
+}
+
+export async function readWorkersRuntime() {
+  try {
+    await connectMongo(mongoUri);
+    const doc = await WorkerRuntimeModel.findById("runtime").lean().exec();
+    return doc || null;
+  } catch (err) {
+    debugLog("readWorkersRuntime failed", err);
+    return null;
+  }
+}
+
+async function persistLog(event) {
+  try {
+    await connectMongo(mongoUri);
+    const payload = { ...event };
+    if (!payload.at) payload.at = new Date().toISOString();
+    await LogModel.create(payload);
+  } catch (err) {
+    debugLog("logJson failed", err);
+  }
+}
+
+function debugLog(message, err) {
+  if (process.env.DEBUG_LOGGER !== "true") return;
+  console.error(`[logger] ${message}`, err);
 }
