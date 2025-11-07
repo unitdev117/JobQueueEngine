@@ -1,10 +1,7 @@
 import { connectMongo, LogModel, WorkerRuntimeModel } from "../models/index.js";
-
-let logDir = null;
 let mongoUri = null;
 
-export function initLogger(dir, uri) {
-  logDir = dir; // kept for backwards compatibility/log statements if needed
+export function initLogger(uri) {
   mongoUri = uri || mongoUri || process.env.MONGODB_URI;
 }
 

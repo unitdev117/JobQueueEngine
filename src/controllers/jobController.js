@@ -18,19 +18,7 @@ export async function enqueueController(config, jobJson) {
   if (typeof data.command === "string") {
     const parts = splitCommandString(data.command);
     if (parts.length === 0) throw new Error("Job.command string is empty");
-    // Windows compatibility for 'sleep N'
-    if (process.platform === "win32" && parts[0].toLowerCase() === "sleep") {
-      const sec = Number(parts[1] || 1);
-      data.command = [
-        "powershell",
-        "-NoLogo",
-        "-NoProfile",
-        "-Command",
-        `Start-Sleep -Seconds ${Math.max(0, Math.floor(sec))}`,
-      ];
-    } else {
-      data.command = parts;
-    }
+    data.command = parts;
   }
   if (!Array.isArray(data.command))
     throw new Error("Job.command must be an array or string");

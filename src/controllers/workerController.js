@@ -7,12 +7,12 @@ import {
   logJson,
   setWorkersStopFlag,
 } from "../utils/logger.js";
-import { spawn, execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { setMongoKeepAlive } from "../models/index.js";
 
 // Starts the worker loops. It just awaits them (they run until stop flag exists).
 export async function workerStartController(config, count, opts = {}) {
-  initLogger(config.LOG_DIR, config.MONGODB_URI);
+  initLogger(config.MONGODB_URI);
   const howMany = Number(count || config.CONCURRENCY) || 1;
   await setWorkersStopFlag(false);
   console.log(`Starting ${howMany} worker(s) using MongoDB persistence`);
@@ -49,7 +49,7 @@ export async function workerStartController(config, count, opts = {}) {
 
 // Writes a small STOP file that workers check to shutdown gracefully.
 export async function workerStopController(config) {
-  initLogger(config.LOG_DIR, config.MONGODB_URI);
+  initLogger(config.MONGODB_URI);
   await setWorkersStopFlag(true);
   try {
     logJson({
@@ -63,22 +63,14 @@ export async function workerStopController(config) {
 
 // Reads the worker runtime info for status command.
 export async function workersInfoController(config) {
-  initLogger(config.LOG_DIR, config.MONGODB_URI);
+  initLogger(config.MONGODB_URI);
   const info = await readWorkersRuntime();
   if (!info || !info.pid) return { running: false };
   if (info.stopRequested) return { running: false };
   // Verify pid exists to avoid stale status
   try {
-    if (process.platform === "win32") {
-      const out = execSync(`tasklist /FI "PID eq ${info.pid}"`, {
-        stdio: ["ignore", "pipe", "ignore"],
-      }).toString();
-      if (out.includes(String(info.pid))) return info;
-      return { running: false };
-    } else {
-      process.kill(info.pid, 0);
-      return info;
-    }
+    process.kill(info.pid, 0);
+    return info;
   } catch {
     return { running: false };
   }

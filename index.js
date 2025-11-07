@@ -144,7 +144,7 @@ const cli = yargs(hideBin(process.argv))
   .middleware([
     (argv) => {
       const config = loadConfig(argv);
-      initLogger(config.LOG_DIR, config.MONGODB_URI);
+      initLogger(config.MONGODB_URI);
       argv.__config = config;
       argv.__rawArgs = process.argv.slice(2);
       try {
