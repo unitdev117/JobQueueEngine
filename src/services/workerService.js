@@ -1,7 +1,13 @@
-import { connectMongo, JobModel } from "../models/index.js";
+import { connectMongo } from "../db/mongo.js";
+import { JobModel } from "../models/index.js";
 import { executeCommand } from "../processors/executeCommand.js";
 import { handleResult } from "../processors/retryOrDlq.js";
-import { logJson, writeWorkersRuntime, readWorkersRuntime, setWorkersStopFlag } from "../utils/logger.js";
+import {
+  logJson,
+  writeWorkersRuntime,
+  readWorkersRuntime,
+  setWorkersStopFlag,
+} from "../utils/logger.js";
 
 const PENDING_STATES = ["pending", "failed"];
 

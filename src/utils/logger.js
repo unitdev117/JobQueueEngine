@@ -1,4 +1,5 @@
-import { connectMongo, LogModel, WorkerRuntimeModel } from "../models/index.js";
+import { connectMongo } from "../db/mongo.js";
+import { LogModel, WorkerRuntimeModel } from "../models/index.js";
 let mongoUri = null;
 
 export function initLogger(uri) {

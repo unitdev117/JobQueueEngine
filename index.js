@@ -14,12 +14,17 @@ import {
   listJobIdsByState,
   countProcessingWorkers,
 } from "./src/services/jobService.js";
-import { disconnectMongo } from "./src/models/index.js";
+import { disconnectMongo } from "./src/db/mongo.js";
 
 // Lightweight static server to host src/public when workers are running.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 let __dashServer = null;
+let shouldDisconnect = true;
+
+function markLongRunningCommand() {
+  shouldDisconnect = false;
+}
 
 function startDashboardServer(port, config) {
   if (__dashServer || !Number.isFinite(port)) return;
@@ -155,8 +160,18 @@ const cli = yargs(hideBin(process.argv))
   .scriptName("queuectl")
   .usage("$0 <cmd> [args]")
   .help(false)
-  .version(false);
-makeRoutes(cli);
+  .version(false)
+  .fail((msg, err) => {
+    if (err && err.message) {
+      console.error(err.message);
+    } else if (msg) {
+      console.error(msg);
+    } else {
+      console.error("Command failed");
+    }
+    process.exit(1);
+  });
+makeRoutes(cli, { markLongRunningCommand });
 
 // Extra command: serve the dashboard even if workers are not running.
 cli.command(
@@ -175,6 +190,7 @@ cli.command(
       port,
       argv.__config || { MONGODB_URI: process.env.MONGODB_URI }
     );
+    markLongRunningCommand();
     console.log("Press Ctrl+C to stop");
   }
 );
@@ -184,5 +200,7 @@ const configuredCli = cli.demandCommand(1).strict();
 try {
   await configuredCli.parseAsync();
 } finally {
-  await disconnectMongo();
+  if (shouldDisconnect) {
+    await disconnectMongo();
+  }
 }

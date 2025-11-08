@@ -16,7 +16,11 @@ import { configSetController } from "../controllers/configController.js";
 import { listJobIdsByState } from "../services/jobService.js";
 
 // I set up the CLI commands here in a very straightforward way.
-export function makeRoutes(cli) {
+export function makeRoutes(cli, opts = {}) {
+  const markLongRunning =
+    typeof opts.markLongRunningCommand === "function"
+      ? opts.markLongRunningCommand
+      : null;
   cli
     .command(
       "enqueue [job]",
@@ -73,8 +77,11 @@ export function makeRoutes(cli) {
           console.log(r.message);
           return;
         }
-        const opts = argv.detach ? { detach: true } : {};
-        await workerStartController(argv.__config, argv.count, opts);
+        const workerOpts = argv.detach ? { detach: true } : {};
+        if (!argv.detach) {
+          markLongRunning?.();
+        }
+        await workerStartController(argv.__config, argv.count, workerOpts);
       }
     )
     .command(

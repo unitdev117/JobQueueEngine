@@ -1,4 +1,5 @@
-import { connectMongo, JobModel } from "../models/index.js";
+import { connectMongo } from "../db/mongo.js";
+import { JobModel } from "../models/index.js";
 import { newId } from "../utils/id.js";
 import { now } from "../utils/time.js";
 

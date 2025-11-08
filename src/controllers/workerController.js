@@ -8,7 +8,6 @@ import {
   setWorkersStopFlag,
 } from "../utils/logger.js";
 import { spawn } from "node:child_process";
-import { setMongoKeepAlive } from "../models/index.js";
 
 // Starts the worker loops. It just awaits them (they run until stop flag exists).
 export async function workerStartController(config, count, opts = {}) {
@@ -39,12 +38,7 @@ export async function workerStartController(config, count, opts = {}) {
   try {
     await sanitizeQueueStates(config);
   } catch {}
-  setMongoKeepAlive(true);
-  try {
-    await runWorkers(config, howMany);
-  } finally {
-    setMongoKeepAlive(false);
-  }
+  await runWorkers(config, howMany);
 }
 
 // Writes a small STOP file that workers check to shutdown gracefully.
